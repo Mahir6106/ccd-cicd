@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'mahir6106/student-service'
+        KUBECONFIG = '/var/lib/jenkins/.kube/config'
     }
 
     stages {
@@ -14,16 +15,35 @@ pipeline {
 
         stage('Build and Test') {
             steps {
-                sh '''
-                    python3 -m py_compile app.py
-                    python3 -c "from app import app; c=app.test_client(); assert c.get('/').status_code == 200; assert c.get('/student').status_code == 200; print('Tests passed')"
-            '''
+                sh 'python3 -m py_compile app.py'
             }
         }
 
         stage('Docker Build') {
             steps {
                 sh 'docker build -t ${IMAGE_NAME}:${BUILD_NUMBER} .'
+            }
+        }
+
+        stage('Smoke Test') {
+            steps {
+                sh '''
+                    set -e
+                    NAME=student-service-test-${BUILD_NUMBER}
+                    docker rm -f "$NAME" >/dev/null 2>&1 || true
+                    docker run -d --name "$NAME" -p 5001:5000 ${IMAGE_NAME}:${BUILD_NUMBER}
+                    trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true' EXIT
+
+                    for i in $(seq 1 15); do
+                        if curl -fsS http://127.0.0.1:5001/ >/dev/null; then
+                            break
+                        fi
+                        sleep 2
+                    done
+
+                    curl -fsS http://127.0.0.1:5001/
+                    curl -fsS http://127.0.0.1:5001/student
+                '''
             }
         }
 
@@ -42,7 +62,8 @@ pipeline {
         stage('Deploy to Minikube') {
             steps {
                 sh '''
-                    kubectl set image deployment/student-service student-service=${IMAGE_NAME}:${BUILD_NUMBER} || kubectl apply -f k8s/deployment.yaml
+                    kubectl apply -f k8s/deployment.yaml
+                    kubectl set image deployment/student-service student-service=${IMAGE_NAME}:${BUILD_NUMBER}
                     kubectl apply -f k8s/service.yaml
                     kubectl rollout status deployment/student-service --timeout=180s
                 '''
@@ -60,3 +81,5 @@ pipeline {
         }
     }
 }
+
+
