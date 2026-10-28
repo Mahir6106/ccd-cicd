@@ -382,7 +382,7 @@ PAGE = """
     <main class="container">
         <section class="hero">
             <div>
-                <p class="eyebrow">Cloud Computing &amp; DevOps . BUILD 2</p>
+                <p class="eyebrow">Cloud Computing &amp; DevOps . BUILD 3</p>
                 <h1>Your cloud lab,<br><span>beautifully deployed.</span></h1>
                 <p class="intro">
                     A lightweight Flask microservice, containerized with Docker
